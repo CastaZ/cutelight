@@ -681,7 +681,5 @@
 
   socket.on("connect_error", () => {
     setConnectionStatus({ tone: "error", text: "Connection error" });
-    if (isViewMode) return;
-    window.location.href = "/login";
   });
 })();

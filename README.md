@@ -5,7 +5,7 @@ Phone-friendly web controller for Art-Net DMX on local Wi-Fi.
 ## What this does
 
 - Hosts a web page on your current local network (for you: `cutelab` Wi-Fi).
-- Anyone with the passcode can control fixtures from phone or laptop.
+- Anyone on the same local network can control fixtures from phone or laptop.
 - Sends DMX via Art-Net to your node at `192.168.88.150` by default.
 - Uses scalable fixture patch config in `config/fixtures.json`.
 
@@ -60,7 +60,6 @@ git push
 
 - `HOST=0.0.0.0`
 - `PORT=3000`
-- `WEBDMX_PASSCODE=webdmx`
 - `ARTNET_HOST=192.168.88.150`
 - `ARTNET_PORT=6454`
 - `ARTNET_IFACE=` (optional, local Ethernet IP to force Art-Net out that interface)
@@ -69,7 +68,7 @@ git push
 Example custom run:
 
 ```bash
-WEBDMX_PASSCODE="yourpass" ARTNET_HOST="192.168.88.150" npm start
+ARTNET_HOST="192.168.88.150" npm start
 ```
 
 Direct Ethernet example (console connected to Mac):
@@ -80,8 +79,7 @@ ARTNET_HOST="10.10.10.50" ARTNET_IFACE="10.10.10.1" npm start
 
 ## Control routes
 
-- `/` control UI (requires passcode)
-- `/login` passcode page
+- `/` control UI (no passcode)
 - `/view` read-only view (no passcode, cannot write)
 
 ## Fixture patch and profiles
