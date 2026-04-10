@@ -1,0 +1,18 @@
+{
+  "name": "webdmx",
+  "version": "1.0.0",
+  "main": "server/index.js",
+  "scripts": {
+    "start": "node server/index.js",
+    "dev": "node server/index.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "description": "",
+  "dependencies": {
+    "artnet": "^1.4.0",
+    "express": "^5.2.1",
+    "socket.io": "^4.8.3"
+  }
+}

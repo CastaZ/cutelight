@@ -1,0 +1,16 @@
+[Unit]
+Description=WebDMX server
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=pi
+WorkingDirectory=/home/pi/webdmx
+EnvironmentFile=/home/pi/webdmx/deploy/webdmx.env
+ExecStart=/usr/bin/node /home/pi/webdmx/server/index.js
+Restart=always
+RestartSec=2
+
+[Install]
+WantedBy=multi-user.target

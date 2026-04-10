@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>CuteLight</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="/public/styles.css" />
+  </head>
+  <body>
+    <header class="topbar">
+      <h1 class="brand-title">CuteLight</h1>
+      <div class="topbar-actions">
+        <span id="connectionBadge" class="badge neutral">Connecting...</span>
+        <a class="btn secondary" href="/view">View Only</a>
+        <a class="btn secondary" href="/logout">Logout</a>
+      </div>
+    </header>
+
+    <main class="container">
+      <section class="panel">
+        <div class="row">
+          <h2>Master</h2>
+          <span id="readOnlyBadge" class="badge hidden">View only</span>
+        </div>
+        <div class="slider-row">
+          <label for="masterSlider">Master Dimmer</label>
+          <input id="masterSlider" type="range" min="0" max="255" value="255" />
+          <span id="masterValue" class="value">255</span>
+        </div>
+        <div class="row buttons">
+          <button id="blackoutBtn" class="btn danger">Blackout</button>
+          <button id="resetBtn" class="btn">Reset</button>
+        </div>
+      </section>
+
+      <section class="panel">
+        <h2>Fixtures</h2>
+        <div id="fixtures" class="fixtures"></div>
+      </section>
+
+      <section class="panel">
+        <h2>Programs</h2>
+        <div id="programsRoot"></div>
+      </section>
+
+      <section class="panel">
+        <div class="row">
+          <h2>Universe Channels</h2>
+          <select id="universeSelect"></select>
+        </div>
+        <div id="absoluteChannels" class="absolute-channels"></div>
+      </section>
+    </main>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="/public/app.js"></script>
+  </body>
+</html>
