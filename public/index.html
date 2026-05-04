@@ -39,13 +39,35 @@
       </section>
 
       <section class="panel">
-        <h2>Fixtures</h2>
-        <div id="fixtures" class="fixtures"></div>
+        <h2>Programs</h2>
+        <div id="programsRoot"></div>
       </section>
 
       <section class="panel">
-        <h2>Programs</h2>
-        <div id="programsRoot"></div>
+        <div class="row">
+          <h2>Gobo</h2>
+        </div>
+        <div class="gobo-controls">
+          <label for="goboFixtureSelect">Fixture</label>
+          <select id="goboFixtureSelect"></select>
+          <div id="goboJoystick" class="joystick" aria-label="Gobo pan and tilt joystick">
+            <div id="goboKnob" class="joystick-knob"></div>
+          </div>
+          <div class="row">
+            <button id="goboCenterBtn" class="btn secondary" type="button">Center</button>
+            <span id="goboValue" class="value">Pan 128 | Tilt 128</span>
+          </div>
+          <div class="gobo-color-panel">
+            <span class="gobo-color-title">Color Wheel</span>
+            <div id="goboColorSwatches" class="color-swatches"></div>
+            <span id="goboColorValue" class="value">Color: -</span>
+          </div>
+        </div>
+      </section>
+
+      <section class="panel">
+        <h2>Fixtures</h2>
+        <div id="fixtures" class="fixtures"></div>
       </section>
 
       <section class="panel">

@@ -9,16 +9,31 @@ on:
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    env:
+      PI_HOST: ${{ secrets.PI_HOST != '' && secrets.PI_HOST || vars.PI_HOST }}
+      PI_USER: ${{ secrets.PI_USER != '' && secrets.PI_USER || vars.PI_USER }}
+      PI_APP_DIR: ${{ secrets.PI_APP_DIR != '' && secrets.PI_APP_DIR || vars.PI_APP_DIR }}
+      PI_SERVICE_NAME: ${{ secrets.PI_SERVICE_NAME != '' && secrets.PI_SERVICE_NAME || vars.PI_SERVICE_NAME }}
+      PI_SSH_KEY: ${{ secrets.PI_SSH_KEY }}
     steps:
+      - name: Validate deploy configuration
+        run: |
+          set -euo pipefail
+          test -n "${PI_HOST}" || (echo "Missing PI_HOST (set repository Secret or Variable)." && exit 1)
+          test -n "${PI_USER}" || (echo "Missing PI_USER (set repository Secret or Variable)." && exit 1)
+          test -n "${PI_APP_DIR}" || (echo "Missing PI_APP_DIR (set repository Secret or Variable)." && exit 1)
+          test -n "${PI_SERVICE_NAME}" || (echo "Missing PI_SERVICE_NAME (set repository Secret or Variable)." && exit 1)
+          test -n "${PI_SSH_KEY}" || (echo "Missing PI_SSH_KEY (set repository Secret)." && exit 1)
+
       - name: Deploy over SSH
         uses: appleboy/ssh-action@v1.2.0
         with:
-          host: ${{ secrets.PI_HOST }}
-          username: ${{ secrets.PI_USER }}
-          key: ${{ secrets.PI_SSH_KEY }}
+          host: ${{ env.PI_HOST }}
+          username: ${{ env.PI_USER }}
+          key: ${{ env.PI_SSH_KEY }}
           script: |
-            export APP_DIR="${{ secrets.PI_APP_DIR }}"
+            export APP_DIR="${{ env.PI_APP_DIR }}"
             export BRANCH="main"
-            export SERVICE_NAME="${{ secrets.PI_SERVICE_NAME }}"
+            export SERVICE_NAME="${{ env.PI_SERVICE_NAME }}"
             cd "${APP_DIR}"
             ./scripts/update-on-pi.sh

@@ -15,10 +15,16 @@
       scenes: [],
       chases: [],
       macros: [],
-      activeChaseId: null
+      activeChaseId: null,
+      washColor: { dimmer: 255, red: 255, green: 255, blue: 255, lime: 0, amber: 0, uv: 0 },
+      pulse: { active: false, speedMs: 900 }
     },
     selectedUniverse: "0",
-    readOnly: isViewMode
+    readOnly: isViewMode,
+    gobo: {
+      selectedFixtureId: "",
+      dragging: false
+    }
   };
 
   const ui = {
@@ -26,7 +32,8 @@
     fixtureCards: new Map(),
     absoluteRows: new Map(),
     universeOptionsSignature: "",
-    programsSignature: ""
+    programsSignature: "",
+    goboOptionsSignature: ""
   };
 
   const interaction = {
@@ -44,6 +51,24 @@
   const programsRoot = document.getElementById("programsRoot");
   const absoluteChannels = document.getElementById("absoluteChannels");
   const universeSelect = document.getElementById("universeSelect");
+  const goboFixtureSelect = document.getElementById("goboFixtureSelect");
+  const goboJoystick = document.getElementById("goboJoystick");
+  const goboKnob = document.getElementById("goboKnob");
+  const goboCenterBtn = document.getElementById("goboCenterBtn");
+  const goboValue = document.getElementById("goboValue");
+  const goboColorSwatches = document.getElementById("goboColorSwatches");
+  const goboColorValue = document.getElementById("goboColorValue");
+  const goboColorButtons = new Map();
+  const goboColors = [
+    { label: "Open", value: 16, css: "#ffffff" },
+    { label: "Red", value: 48, css: "#ff3b3b" },
+    { label: "Green", value: 80, css: "#00d84a" },
+    { label: "Blue", value: 112, css: "#1d4dff" },
+    { label: "Yellow", value: 144, css: "#ffe95a" },
+    { label: "Magenta", value: 176, css: "#ff48c9" },
+    { label: "Amber", value: 208, css: "#ff9a00" },
+    { label: "Cyan", value: 240, css: "#45d4ff" }
+  ];
 
   function clampByte(value) {
     const num = Number(value);
@@ -98,7 +123,9 @@
     const sceneIds = (programs.scenes || []).map((scene) => scene.id).join(",");
     const chaseIds = (programs.chases || []).map((chase) => chase.id).join(",");
     const macroIds = (programs.macros || []).map((macro) => macro.id).join(",");
-    return `${sceneIds}|${chaseIds}|${macroIds}|${programs.activeChaseId || ""}`;
+    const wash = programs.washColor || {};
+    const pulse = programs.pulse || {};
+    return `${sceneIds}|${chaseIds}|${macroIds}|${programs.activeChaseId || ""}|${wash.red || 0}|${wash.green || 0}|${wash.blue || 0}|${wash.lime || 0}|${wash.amber || 0}|${wash.uv || 0}|${wash.dimmer || 0}|${pulse.active ? 1 : 0}|${pulse.speedMs || 0}`;
   }
 
   function incomingValue(controlKey, nextValue) {
@@ -120,6 +147,8 @@
     blackoutBtn.disabled = state.readOnly;
     resetBtn.disabled = state.readOnly;
     masterSlider.disabled = state.readOnly;
+    goboFixtureSelect.disabled = state.readOnly;
+    goboCenterBtn.disabled = state.readOnly;
   }
 
   function setConnectionStatus(status) {
@@ -151,6 +180,224 @@
     return `${match.min}-${match.max}: ${match.label}`;
   }
 
+  function findChannelIndexByName(fixture, keyword) {
+    const channels = fixtureChannels(fixture);
+    const needle = String(keyword).toLowerCase();
+    return channels.findIndex((channel) => String(channel.name || "").toLowerCase().includes(needle));
+  }
+
+  function goboFixtures() {
+    return state.fixtures.filter((fixture) => {
+      const panIndex = findChannelIndexByName(fixture, "pan");
+      const tiltIndex = findChannelIndexByName(fixture, "tilt");
+      return panIndex !== -1 && tiltIndex !== -1;
+    });
+  }
+
+  function goboOptionsSignature() {
+    return goboFixtures()
+      .map((fixture) => fixture.id)
+      .join(",");
+  }
+
+  function currentGoboFixture() {
+    if (!state.gobo.selectedFixtureId) return null;
+    return state.fixtures.find((fixture) => fixture.id === state.gobo.selectedFixtureId) || null;
+  }
+
+  function panTiltValuesFromFixture(fixture) {
+    const panIndex = findChannelIndexByName(fixture, "pan");
+    const tiltIndex = findChannelIndexByName(fixture, "tilt");
+    if (panIndex === -1 || tiltIndex === -1) return null;
+
+    const values = state.values[fixture.id] || [];
+    return {
+      panIndex,
+      tiltIndex,
+      pan: clampByte(values[panIndex] ?? 128),
+      tilt: clampByte(values[tiltIndex] ?? 128)
+    };
+  }
+
+  function goboColorMetaFromFixture(fixture) {
+    const colorIndex = findChannelIndexByName(fixture, "color");
+    if (colorIndex === -1) return null;
+    const channels = fixtureChannels(fixture);
+    const values = state.values[fixture.id] || [];
+    return {
+      colorIndex,
+      value: clampByte(values[colorIndex] ?? 0),
+      ranges: channels[colorIndex]?.ranges || []
+    };
+  }
+
+  function joystickPointFromPanTilt(pan, tilt) {
+    return {
+      x: pan / 127.5 - 1,
+      y: 1 - tilt / 127.5
+    };
+  }
+
+  function panTiltFromJoystickPoint(x, y) {
+    return {
+      pan: clampByte((x + 1) * 127.5),
+      tilt: clampByte((1 - y) * 127.5)
+    };
+  }
+
+  function moveGoboKnob(x, y) {
+    const r = 68;
+    const tx = Math.round(x * r);
+    const ty = Math.round(y * r);
+    goboKnob.style.transform = `translate(calc(-50% + ${tx}px), calc(-50% + ${ty}px))`;
+  }
+
+  function writeFixtureChannel(fixture, channelIndex, nextValue) {
+    const controlKey = keyForFixtureChannel(fixture.id, channelIndex);
+    if (!Array.isArray(state.values[fixture.id])) {
+      state.values[fixture.id] = new Array(fixture.channelCount).fill(0);
+    }
+    state.values[fixture.id][channelIndex] = clampByte(nextValue);
+    interaction.pendingWrites.set(controlKey, clampByte(nextValue));
+    if (state.readOnly) return;
+    socket.emit("channel:set", {
+      fixtureId: fixture.id,
+      channelIndex,
+      value: nextValue
+    });
+  }
+
+  function applyJoystickPoint(x, y) {
+    const fixture = currentGoboFixture();
+    if (!fixture) return;
+    const panTilt = panTiltValuesFromFixture(fixture);
+    if (!panTilt) return;
+    const { pan, tilt } = panTiltFromJoystickPoint(x, y);
+    moveGoboKnob(x, y);
+    goboValue.textContent = `Pan ${pan} | Tilt ${tilt}`;
+    writeFixtureChannel(fixture, panTilt.panIndex, pan);
+    writeFixtureChannel(fixture, panTilt.tiltIndex, tilt);
+  }
+
+  function applyGoboColor(value) {
+    const fixture = currentGoboFixture();
+    if (!fixture) return;
+    const meta = goboColorMetaFromFixture(fixture);
+    if (!meta) return;
+    writeFixtureChannel(fixture, meta.colorIndex, clampByte(value));
+    const dimmerIndex = findChannelIndexByName(fixture, "dimmer");
+    if (dimmerIndex !== -1) {
+      writeFixtureChannel(fixture, dimmerIndex, 255);
+    }
+  }
+
+  function updateGoboColorState() {
+    const fixture = currentGoboFixture();
+    if (!fixture) {
+      goboColorValue.textContent = "Color: -";
+      for (const btn of goboColorButtons.values()) btn.classList.remove("active");
+      return;
+    }
+    const meta = goboColorMetaFromFixture(fixture);
+    if (!meta) {
+      goboColorValue.textContent = "Color: (no color channel)";
+      for (const btn of goboColorButtons.values()) btn.classList.remove("active");
+      return;
+    }
+
+    const rangeText = activeRange(meta.ranges, meta.value);
+    goboColorValue.textContent = rangeText ? `Color: ${rangeText}` : `Color DMX: ${meta.value}`;
+
+    let nearest = goboColors[0];
+    let bestDistance = Math.abs(meta.value - nearest.value);
+    for (const color of goboColors) {
+      const distance = Math.abs(meta.value - color.value);
+      if (distance < bestDistance) {
+        bestDistance = distance;
+        nearest = color;
+      }
+    }
+    for (const [value, btn] of goboColorButtons.entries()) {
+      btn.classList.toggle("active", Number(value) === nearest.value);
+    }
+  }
+
+  function mountGoboColorSwatches() {
+    goboColorSwatches.innerHTML = "";
+    goboColorButtons.clear();
+    for (const color of goboColors) {
+      const btn = document.createElement("button");
+      btn.className = "color-dot";
+      btn.title = color.label;
+      btn.style.background = color.css;
+      btn.disabled = state.readOnly;
+      btn.addEventListener("click", () => {
+        if (state.readOnly) return;
+        applyGoboColor(color.value);
+      });
+      goboColorButtons.set(color.value, btn);
+      goboColorSwatches.appendChild(btn);
+    }
+  }
+
+  function updateGoboFromState() {
+    const fixture = currentGoboFixture();
+    if (!fixture) {
+      goboValue.textContent = "No gobo fixture";
+      moveGoboKnob(0, 0);
+      updateGoboColorState();
+      return;
+    }
+    const panTilt = panTiltValuesFromFixture(fixture);
+    if (!panTilt) {
+      goboValue.textContent = "Missing pan/tilt channels";
+      moveGoboKnob(0, 0);
+      updateGoboColorState();
+      return;
+    }
+    const point = joystickPointFromPanTilt(panTilt.pan, panTilt.tilt);
+    goboValue.textContent = `Pan ${panTilt.pan} | Tilt ${panTilt.tilt}`;
+    if (!state.gobo.dragging) {
+      moveGoboKnob(point.x, point.y);
+    }
+    updateGoboColorState();
+  }
+
+  function renderGoboFixtureOptions(force = false) {
+    const signature = goboOptionsSignature();
+    if (!force && signature === ui.goboOptionsSignature) return;
+    ui.goboOptionsSignature = signature;
+
+    const fixtures = goboFixtures();
+    goboFixtureSelect.innerHTML = "";
+
+    if (fixtures.length === 0) {
+      const option = document.createElement("option");
+      option.textContent = "No gobo fixtures";
+      option.value = "";
+      goboFixtureSelect.appendChild(option);
+      state.gobo.selectedFixtureId = "";
+      goboFixtureSelect.disabled = true;
+      goboCenterBtn.disabled = true;
+      return;
+    }
+
+    goboFixtureSelect.disabled = state.readOnly;
+    goboCenterBtn.disabled = state.readOnly;
+
+    if (!fixtures.some((fixture) => fixture.id === state.gobo.selectedFixtureId)) {
+      state.gobo.selectedFixtureId = fixtures[0].id;
+    }
+
+    for (const fixture of fixtures) {
+      const option = document.createElement("option");
+      option.value = fixture.id;
+      option.textContent = fixture.name || fixture.id;
+      if (fixture.id === state.gobo.selectedFixtureId) option.selected = true;
+      goboFixtureSelect.appendChild(option);
+    }
+  }
+
   function buildNumberInput(initialValue, onChange) {
     const input = document.createElement("input");
     input.type = "number";
@@ -172,6 +419,23 @@
     if (num < 100) return 100;
     if (num > 60000) return 60000;
     return Math.round(num);
+  }
+
+  function toHex2(value) {
+    return clampByte(value).toString(16).padStart(2, "0");
+  }
+
+  function rgbToHex({ red, green, blue }) {
+    return `#${toHex2(red)}${toHex2(green)}${toHex2(blue)}`;
+  }
+
+  function hexToRgb(hex) {
+    if (typeof hex !== "string" || !/^#[0-9a-fA-F]{6}$/.test(hex)) return null;
+    return {
+      red: parseInt(hex.slice(1, 3), 16),
+      green: parseInt(hex.slice(3, 5), 16),
+      blue: parseInt(hex.slice(5, 7), 16)
+    };
   }
 
   function createFixtureCard(fixture) {
@@ -301,7 +565,7 @@
   }
 
   function renderPrograms() {
-    const { scenes, chases, macros, activeChaseId } = state.programs;
+    const { scenes, chases, macros, activeChaseId, washColor, pulse } = state.programs;
     programsRoot.innerHTML = "";
 
     const sceneBlock = document.createElement("section");
@@ -454,9 +718,114 @@
     }
     macroBlock.appendChild(macroList);
 
+    const colorBlock = document.createElement("section");
+    colorBlock.className = "program-block";
+    colorBlock.innerHTML = "<h3>Color Panel (All Wash Lights)</h3>";
+
+    const swatchRow = document.createElement("div");
+    swatchRow.className = "color-swatches";
+    const swatches = [
+      { name: "Red", color: "#ff0000", payload: { dimmer: 255, red: 255, green: 0, blue: 0, lime: 0, amber: 0, uv: 0 } },
+      { name: "Yellow", color: "#fff000", payload: { dimmer: 255, red: 255, green: 255, blue: 0, lime: 0, amber: 40, uv: 0 } },
+      { name: "Blue", color: "#1d4dff", payload: { dimmer: 255, red: 0, green: 0, blue: 255, lime: 0, amber: 0, uv: 0 } },
+      { name: "Green", color: "#00d84a", payload: { dimmer: 255, red: 0, green: 255, blue: 0, lime: 40, amber: 0, uv: 0 } },
+      { name: "Amber", color: "#ff9a00", payload: { dimmer: 255, red: 255, green: 80, blue: 0, lime: 0, amber: 255, uv: 0 } },
+      { name: "UV", color: "#8e44ff", payload: { dimmer: 255, red: 20, green: 0, blue: 60, lime: 0, amber: 0, uv: 255 } },
+      { name: "White", color: "#ffffff", payload: { dimmer: 255, red: 255, green: 255, blue: 255, lime: 180, amber: 180, uv: 0 } }
+    ];
+
+    for (const swatch of swatches) {
+      const btn = document.createElement("button");
+      btn.className = "color-dot";
+      btn.title = swatch.name;
+      btn.style.background = swatch.color;
+      btn.disabled = state.readOnly;
+      btn.addEventListener("click", () => {
+        socket.emit("program:washColorSet", swatch.payload);
+      });
+      swatchRow.appendChild(btn);
+    }
+    colorBlock.appendChild(swatchRow);
+
+    const pickerRow = document.createElement("div");
+    pickerRow.className = "program-controls";
+    const picker = document.createElement("input");
+    picker.type = "color";
+    picker.value = rgbToHex(washColor || { red: 255, green: 255, blue: 255 });
+    picker.disabled = state.readOnly;
+    picker.addEventListener("focus", () => markActive("program:color-picker"));
+    picker.addEventListener("blur", () => {
+      unmarkActive("program:color-picker");
+      renderProgramsIfNeeded(true);
+    });
+    picker.addEventListener("input", () => {
+      const rgb = hexToRgb(picker.value);
+      if (!rgb) return;
+      socket.emit("program:washColorSet", {
+        dimmer: 255,
+        red: rgb.red,
+        green: rgb.green,
+        blue: rgb.blue,
+        lime: 0,
+        amber: 0,
+        uv: 0
+      });
+    });
+    picker.addEventListener("change", () => {
+      unmarkActive("program:color-picker");
+      renderProgramsIfNeeded(true);
+    });
+    pickerRow.appendChild(picker);
+    colorBlock.appendChild(pickerRow);
+
+    const pulseControls = document.createElement("div");
+    pulseControls.className = "program-controls";
+    const speed = document.createElement("input");
+    speed.type = "range";
+    speed.min = "120";
+    speed.max = "2400";
+    speed.step = "20";
+    speed.value = String(Math.max(120, Number(pulse?.speedMs) || 900));
+    speed.disabled = state.readOnly;
+
+    const speedLabel = document.createElement("span");
+    speedLabel.className = "list-label";
+    speedLabel.textContent = `Pulse Speed: ${speed.value} ms`;
+
+    speed.addEventListener("input", () => {
+      speedLabel.textContent = `Pulse Speed: ${speed.value} ms`;
+    });
+
+    speed.addEventListener("change", () => {
+      socket.emit("program:pulseSpeedSet", { speedMs: Number(speed.value) });
+    });
+
+    const pulseBtn = document.createElement("button");
+    pulseBtn.className = "btn secondary";
+    pulseBtn.textContent = pulse && pulse.active ? "Pulse Running" : "Start Pulse";
+    pulseBtn.disabled = state.readOnly || Boolean(pulse && pulse.active);
+    pulseBtn.addEventListener("click", () => {
+      socket.emit("program:pulseStart");
+    });
+
+    const pulseStopBtn = document.createElement("button");
+    pulseStopBtn.className = "btn danger";
+    pulseStopBtn.textContent = "Stop Pulse";
+    pulseStopBtn.disabled = state.readOnly || !(pulse && pulse.active);
+    pulseStopBtn.addEventListener("click", () => {
+      socket.emit("program:pulseStop");
+    });
+
+    pulseControls.appendChild(speedLabel);
+    pulseControls.appendChild(speed);
+    pulseControls.appendChild(pulseBtn);
+    pulseControls.appendChild(pulseStopBtn);
+    colorBlock.appendChild(pulseControls);
+
     programsRoot.appendChild(sceneBlock);
     programsRoot.appendChild(chaseBlock);
     programsRoot.appendChild(macroBlock);
+    programsRoot.appendChild(colorBlock);
   }
 
   function sortedUniverseKeys() {
@@ -596,6 +965,14 @@
     for (const row of ui.absoluteRows.values()) {
       row.slider.disabled = state.readOnly || !row.patchable;
     }
+    const hasGobo = goboFixtures().length > 0;
+    goboFixtureSelect.disabled = state.readOnly || !hasGobo;
+    goboCenterBtn.disabled = state.readOnly || !hasGobo;
+    const fixture = currentGoboFixture();
+    const hasColor = fixture ? Boolean(goboColorMetaFromFixture(fixture)) : false;
+    for (const btn of goboColorButtons.values()) {
+      btn.disabled = state.readOnly || !hasColor;
+    }
   }
 
   function ensureStructure() {
@@ -604,11 +981,14 @@
       ui.fixtureSignature = nextFixtureSignature;
       mountFixtures();
       renderAbsoluteChannels(true);
+      renderGoboFixtureOptions(true);
     }
     renderUniverseOptions();
+    renderGoboFixtureOptions();
   }
 
   function renderProgramsIfNeeded(force = false) {
+    if (!force && interaction.active.has("program:color-picker")) return;
     const signature = programsSignature(state.programs);
     if (!force && ui.programsSignature === signature) return;
     ui.programsSignature = signature;
@@ -621,6 +1001,7 @@
     patchMaster();
     patchFixtureValues();
     patchAbsoluteValues();
+    updateGoboFromState();
     renderProgramsIfNeeded(forcePrograms);
     syncReadOnlyState();
   }
@@ -650,6 +1031,54 @@
     if (state.readOnly) return;
     socket.emit("scene:reset");
   });
+
+  goboFixtureSelect.addEventListener("change", () => {
+    state.gobo.selectedFixtureId = goboFixtureSelect.value;
+    updateGoboFromState();
+  });
+
+  goboCenterBtn.addEventListener("click", () => {
+    if (state.readOnly) return;
+    applyJoystickPoint(0, 0);
+  });
+
+  function joystickPointFromEvent(event) {
+    const rect = goboJoystick.getBoundingClientRect();
+    const cx = rect.left + rect.width / 2;
+    const cy = rect.top + rect.height / 2;
+    let x = (event.clientX - cx) / (rect.width / 2);
+    let y = (event.clientY - cy) / (rect.height / 2);
+    const mag = Math.hypot(x, y);
+    if (mag > 1) {
+      x /= mag;
+      y /= mag;
+    }
+    return { x, y };
+  }
+
+  goboJoystick.addEventListener("pointerdown", (event) => {
+    if (state.readOnly) return;
+    state.gobo.dragging = true;
+    goboJoystick.setPointerCapture(event.pointerId);
+    const point = joystickPointFromEvent(event);
+    applyJoystickPoint(point.x, point.y);
+  });
+
+  goboJoystick.addEventListener("pointermove", (event) => {
+    if (state.readOnly || !state.gobo.dragging) return;
+    const point = joystickPointFromEvent(event);
+    applyJoystickPoint(point.x, point.y);
+  });
+
+  goboJoystick.addEventListener("pointerup", () => {
+    state.gobo.dragging = false;
+  });
+
+  goboJoystick.addEventListener("pointercancel", () => {
+    state.gobo.dragging = false;
+  });
+
+  mountGoboColorSwatches();
 
   socket.on("state:init", (nextState) => {
     normalizeState(nextState);

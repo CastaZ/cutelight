@@ -92,6 +92,7 @@ io.on("connection", (socket) => {
     if (socket.data.readOnly) return;
     if (!payload || typeof payload.fixtureId !== "string") return;
     programs.stopChase();
+    programs.stopPulse();
 
     const ok = dmx.setChannel({
       fixtureId: payload.fixtureId,
@@ -105,6 +106,7 @@ io.on("connection", (socket) => {
   socket.on("master:set", (value) => {
     if (socket.data.readOnly) return;
     programs.stopChase();
+    programs.stopPulse();
     dmx.setMaster(Number(value));
     emitState();
   });
@@ -112,6 +114,7 @@ io.on("connection", (socket) => {
   socket.on("scene:blackout", () => {
     if (socket.data.readOnly) return;
     programs.stopChase();
+    programs.stopPulse();
     dmx.blackout();
     emitState();
   });
@@ -119,6 +122,7 @@ io.on("connection", (socket) => {
   socket.on("scene:reset", () => {
     if (socket.data.readOnly) return;
     programs.stopChase();
+    programs.stopPulse();
     dmx.resetAll();
     emitState();
   });
@@ -183,6 +187,35 @@ io.on("connection", (socket) => {
     if (!payload || typeof payload.macroId !== "string") return;
     const ok = programs.applyMacro({ macroId: payload.macroId });
     if (!ok) return;
+    emitState();
+  });
+
+  socket.on("program:washColorSet", (payload) => {
+    if (socket.data.readOnly) return;
+    if (!payload || typeof payload !== "object") return;
+    programs.stopChase();
+    programs.setWashColor(payload);
+    emitState();
+  });
+
+  socket.on("program:pulseSpeedSet", (payload) => {
+    if (socket.data.readOnly) return;
+    if (!payload || typeof payload.speedMs !== "number") return;
+    programs.stopChase();
+    programs.setPulseSpeed(payload.speedMs);
+    emitState();
+  });
+
+  socket.on("program:pulseStart", () => {
+    if (socket.data.readOnly) return;
+    programs.stopChase();
+    programs.startPulse({});
+    emitState();
+  });
+
+  socket.on("program:pulseStop", () => {
+    if (socket.data.readOnly) return;
+    programs.stopPulse();
     emitState();
   });
 });

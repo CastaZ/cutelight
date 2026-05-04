@@ -45,6 +45,51 @@
         "movementMacro": 96,
         "movementSpeed": 90
       }
+    },
+    {
+      "id": "macro_red_blue",
+      "name": "Red/Blue",
+      "type": "washSplit",
+      "targetType": "rgbaluv11",
+      "params": {
+        "first": {
+          "dimmer": 255,
+          "red": 255,
+          "green": 0,
+          "blue": 0,
+          "lime": 0,
+          "amber": 0,
+          "uv": 0
+        },
+        "second": {
+          "dimmer": 255,
+          "red": 0,
+          "green": 0,
+          "blue": 255,
+          "lime": 0,
+          "amber": 0,
+          "uv": 0
+        }
+      }
+    },
+    {
+      "id": "macro_pulse",
+      "name": "Pulse",
+      "type": "washPulse",
+      "targetType": "rgbaluv11"
     }
-  ]
+  ],
+  "washColor": {
+    "dimmer": 255,
+    "red": 0,
+    "green": 0,
+    "blue": 0,
+    "lime": 0,
+    "amber": 0,
+    "uv": 0
+  },
+  "pulse": {
+    "active": false,
+    "speedMs": 1500
+  }
 }

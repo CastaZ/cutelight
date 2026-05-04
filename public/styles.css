@@ -131,6 +131,53 @@ input[type="range"] {
   margin-top: 10px;
 }
 
+.gobo-controls {
+  margin-top: 10px;
+  display: grid;
+  gap: 10px;
+}
+
+.gobo-controls label {
+  font-size: 13px;
+  color: #cdd4e2;
+}
+
+.gobo-color-panel {
+  display: grid;
+  gap: 8px;
+}
+
+.gobo-color-title {
+  font-size: 13px;
+  color: #cdd4e2;
+}
+
+.joystick {
+  width: 180px;
+  height: 180px;
+  border-radius: 50%;
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  background:
+    radial-gradient(circle at center, rgba(122, 143, 255, 0.12) 0, rgba(122, 143, 255, 0.02) 60%),
+    rgba(12, 18, 32, 0.85);
+  position: relative;
+  touch-action: none;
+  user-select: none;
+}
+
+.joystick-knob {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  border: 1px solid rgba(255, 255, 255, 0.32);
+  background: #5a7dff;
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.35);
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+}
+
 .program-block {
   border: 1px solid rgba(255, 255, 255, 0.16);
   border-radius: 10px;
@@ -181,6 +228,31 @@ input[type="range"] {
   gap: 8px;
 }
 
+.color-swatches {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.color-dot {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  cursor: pointer;
+}
+
+.color-dot.active {
+  outline: 2px solid #ffffff;
+  outline-offset: 2px;
+}
+
+.color-dot:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
 .absolute-channels {
   margin-top: 10px;
   max-height: 420px;
@@ -206,6 +278,15 @@ input[type="range"] {
   background: #151a24;
   color: #f3f4f6;
   padding: 8px;
+}
+
+#goboFixtureSelect {
+  border-radius: 8px;
+  border: 1px solid #3b4459;
+  background: #151a24;
+  color: #f3f4f6;
+  padding: 8px;
+  max-width: 280px;
 }
 
 .fixture {
